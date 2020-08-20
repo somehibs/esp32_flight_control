@@ -1,6 +1,6 @@
 // Here's where you configure everything 
 #define ESP32
-#define CONTROLLER // Receiver mode is implicit when CONTROLLER is undefined.
+//#define CONTROLLER // RECEIVER is implicit when CONTROLLER is undefined, i.e. the else in ifdef blocks
 #define TFT_ENABLE // Controller has a TFT module for displaying telemetry
 #define TELEMETRY_ENABLE // Telemetry is sent back over ESP NOW occasionally
 //#define TEST // TEST defines some functions that should only be called when testing this software
@@ -10,17 +10,18 @@
 // All protocols will implement the prototype methods in protocols.h
 // All protocols will also define a constant if you need to do protocol specific calls but
 // avoid compiling them into your binary
-
 //#define ESPNOW_ENCRYPTION_KEY // ESP NOW ENCRYPTION - Likely slower or more limited packet sizes
 //#include "fc_esplr.h" // ESP32 LR - special p2p wifi mode that works over 1km. my first tests are unlikely to need this.
 #include "fc_espnow.h" // ESP NOW - Maximum range is 160m LOS
 
+// Controller mappings are configured in controller.h
 #ifdef CONTROLLER
 #include "controller.h"
 void init_receiver(){}
 bool controller = true;
-//uint8_t peerMacAddress[8] = {0x24,0x0a,0xc4,0x62,0x33,0x88};
-uint8_t peerMacAddress[8] = {0xFC,0xF5,0xC4,0x2F,0x3D,0x14}; // RX address
+//uint8_t peerMacAddress[8] = {0x24,0x0a,0xc4,0x62,0x33,0x88}; // TFT?
+//uint8_t peerMacAddress[8] = {0xFC,0xF5,0xC4,0x2F,0x3D,0x14}; // RX address
+uint8_t peerMacAddress[8] = {0x24,0x0A,0xC4,0x62,0x17,0x0C};
 #else
 #include "receiver.h"
 void init_controller(){}
