@@ -71,7 +71,7 @@ public:
       if (invert) {
         state = ANALOG_MAX - state;
       }
-      return map(state, 0, ANALOG_MAX, 0, 10000);
+      return map(state, 0, ANALOG_MAX, 1000, 2000);
     }
     // 0 - mid is 1500-2000
     // mid should be 2000 perfectly
@@ -79,10 +79,10 @@ public:
     short offset = 1500;
     if (state >= diff) {
       offset += 500;
-      return map(state, getMid(), ANALOG_MAX, offset, offset+500);
+      return map(state, getMid(), ANALOG_MAX, 1500, 2000);
     } else {
       // state < mid
-      return map(state, 0, getMid(), offset, offset+500); 
+      return map(state, 0, getMid(), 1000, 1500); 
     }
   }
   short low;
@@ -198,7 +198,7 @@ void init_controller() {
 
 void loop_controller() {
   ctl.loop();
-  delay(100);
+  delay(3);
 }
 
 void send_callback(const uint8_t* peerMac, bool sent) {

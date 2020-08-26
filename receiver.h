@@ -6,6 +6,7 @@
 #include "shared.h"
 
 ControlPacket currentPacket;
+bool mutatedCurrentPacket = false;
 SBusMessage currentMessage;
 bool outstandingPacket = false;
 
@@ -13,22 +14,44 @@ bool outstandingPacket = false;
 #define LOST_PKT_THRESHOLD 2
 short dead = 0;
 
-/*
-struct ControlPacket {
-  short channels[MAX_ANALOG_CHANNELS];
-  byte digitalChannels[2]; // MAX_ANALOG_CHANNELS + 4 digital channels on ch15 ch16 ch17 ch18
-};
-*/
-#define SBUS_CHANNEL_SIZE 11
+void reversi() {
+  currentMessage.footer = 0x0f;
+  currentMessage.header = 0x00;
+}
+#define SBUS_CHANNEL_SIZE 3
 void refreshSbusMessage() {
   memset(&currentMessage, 0, sizeof(SBusMessage));
   currentMessage.header = 0x0F;
   //currentPacket.channels[22]; // 16 11bit channels
   short chanIndex = 0;
-  for (int i = 0; i < MAX_ANALOG_CHANNELS; ++i) {
-    memcpy(currentMessage.channels+chanIndex, currentPacket.channels+i, SBUS_CHANNEL_SIZE);
-    chanIndex += 1;
+  if (!mutatedCurrentPacket) {
+    for (int i = 0; i < MAX_ANALOG_CHANNELS; ++i) {
+      currentPacket.channels[i] = map(currentPacket.channels[i], 1000, 2000, 173, 1811);//192, 1792);
+    }
+    mutatedCurrentPacket = true;
   }
+  currentMessage.channels[1] = (uint8_t) ((currentPacket.channels[0] & 0x07FF));
+  currentMessage.channels[2] = (uint8_t) ((currentPacket.channels[0] & 0x07FF)>>8 | (currentPacket.channels[1] & 0x07FF)<<3);
+  currentMessage.channels[3] = (uint8_t) ((currentPacket.channels[1] & 0x07FF)>>5 | (currentPacket.channels[2] & 0x07FF)<<6);
+  currentMessage.channels[4] = (uint8_t) ((currentPacket.channels[2] & 0x07FF)>>2);
+  currentMessage.channels[5] = (uint8_t) ((currentPacket.channels[2] & 0x07FF)>>10 | (currentPacket.channels[3] & 0x07FF)<<1);
+  currentMessage.channels[6] = (uint8_t) ((currentPacket.channels[3] & 0x07FF)>>7; //| (currentPacket.channels[4] & 0x07FF)<<4);
+  /*currentMessage.channels[7] = (uint8_t) ((currentPacket.channels[4] & 0x07FF)>>4); | (currentPacket.channels[5] & 0x07FF)<<7);
+  currentMessage.channels[8] = (uint8_t) ((currentPacket.channels[5] & 0x07FF)>>1);
+  currentMessage.channels[9] = (uint8_t) ((currentPacket.channels[5] & 0x07FF)>>9 | (currentPacket.channels[6] & 0x07FF)<<2);
+  currentMessage.channels[10] = (uint8_t) ((currentPacket.channels[6] & 0x07FF)>>6 | (currentPacket.channels[7] & 0x07FF)<<5);
+  currentMessage.channels[11] = (uint8_t) ((currentPacket.channels[7] & 0x07FF)>>3);
+  currentMessage.channels[12] = (uint8_t) ((currentPacket.channels[8] & 0x07FF));
+  currentMessage.channels[13] = (uint8_t) ((currentPacket.channels[8] & 0x07FF)>>8 | (currentPacket.channels[9] & 0x07FF)<<3);
+  currentMessage.channels[14] = (uint8_t) ((currentPacket.channels[9] & 0x07FF)>>5 | (currentPacket.channels[10] & 0x07FF)<<6);
+  currentMessage.channels[15] = (uint8_t) ((currentPacket.channels[10] & 0x07FF)>>2);
+  currentMessage.channels[16] = (uint8_t) ((currentPacket.channels[10] & 0x07FF)>>10 | (currentPacket.channels[11] & 0x07FF)<<1);
+  currentMessage.channels[17] = (uint8_t) ((currentPacket.channels[11] & 0x07FF)>>7 | (currentPacket.channels[12] & 0x07FF)<<4);
+  currentMessage.channels[18] = (uint8_t) ((currentPacket.channels[12] & 0x07FF)>>4 | (currentPacket.channels[13] & 0x07FF)<<7);
+  currentMessage.channels[19] = (uint8_t) ((currentPacket.channels[13] & 0x07FF)>>1);
+  currentMessage.channels[20] = (uint8_t) ((currentPacket.channels[13] & 0x07FF)>>9 | (currentPacket.channels[14] & 0x07FF)<<2);
+  currentMessage.channels[21] = (uint8_t) ((currentPacket.channels[14] & 0x07FF)>>6 | (currentPacket.channels[15] & 0x07FF)<<5);
+  currentMessage.channels[22] = (uint8_t) ((currentPacket.channels[15] & 0x07FF)>>3);*/
   for (int i = 0; i < MAX_DIGITAL_BYTES; ++i) {
     for (int j = 0; j < 4; ++j) {
       // If it's on, it's on. If it's off, it's off.
@@ -42,8 +65,9 @@ void refreshSbusMessage() {
     currentMessage.postfix |= 1<<3;
   }
   currentMessage.footer = 0x00;
+  //reversi();
 }
- 
+
 byte txPin, rxPin;
 
 void emitTelemetryStatus(byte status) {
@@ -97,7 +121,7 @@ void maintain_telemetry() {
 }
 
 void writeSBusMessage() {
-    long written = 25;//Serial2.write((uint8_t*)&msg, sizeof(SBusMessage));
+    long written = Serial2.write((uint8_t*)&currentMessage, sizeof(SBusMessage));
     Serial.print(written, DEC);
     if (written == sizeof(SBusMessage)) {
       Serial.println(" bytes written to SBus OK.");
@@ -118,6 +142,7 @@ void maintain_sbus() {
     refreshSbusMessage();
     outstandingPacket = false;
     writeSBusMessage();
+    dead = 0;
   } else {
     dead += 1;
     if (dead > DEAD_PKT_THRESHOLD) {
@@ -126,8 +151,8 @@ void maintain_sbus() {
     if (dead > LOST_PKT_THRESHOLD) {
       currentMessage.postfix |= 1<<3;
     }
-    writeSBusMessage();
-    Serial.println("Missed a message");
+    //writeSBusMessage();
+    //Serial.println("Missed a message");
   }
 }
 
@@ -146,6 +171,7 @@ void recv_callback(const uint8_t* peerMac,  const uint8_t *data, int data_len) {
   if (data_len == sizeof(ControlPacket)) {
     ControlPacket packet = *(ControlPacket*)data;
     memcpy(&currentPacket, &packet, sizeof(ControlPacket));
+    mutatedCurrentPacket = false;
     outstandingPacket = true;
   }
 }
