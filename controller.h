@@ -123,7 +123,7 @@ public:
 
   void calibrate() {
     leftMost.state = true;
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 200; ++i) {
       leftAnalogH.calibrate_step();
       leftAnalogV.calibrate_step();
       rightAnalogH.calibrate_step();
@@ -139,11 +139,11 @@ public:
   void readPinsIntoPacket(ControlPacket* packet) {
     packet->channels[0] = rightAnalogH.getChannel(); // roll
     packet->channels[1] = rightAnalogV.getChannel(); // pitch
-    packet->channels[2] = leftAnalogH.getChannel(); // yaw
-    packet->channels[3] = throttlePot.getChannel(); // throttle
+    packet->channels[3] = leftAnalogH.getChannel(); // yaw
+    packet->channels[2] = throttlePot.getChannel(); // throttle
     packet->digitalChannels[0] = getDigitalChannel(0);
     packet->digitalChannels[1] = getDigitalChannel(1);
-    Serial.printf("R: %d P: %d Y: %d T: %d digi: %d dig2: %d\n", packet->channels[0], packet->channels[1], packet->channels[2], packet->channels[3], packet->digitalChannels[0], packet->digitalChannels[1]);
+    //Serial.printf("R: %d P: %d Y: %d T: %d digi: %d dig2: %d\n", packet->channels[0], packet->channels[1], packet->channels[2], packet->channels[3], packet->digitalChannels[0], packet->digitalChannels[1]);
   }
 
   byte getDigitalChannel(short channel) {
