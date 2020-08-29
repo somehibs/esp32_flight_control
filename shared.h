@@ -23,8 +23,9 @@ enum ReceiverStatus {
   RECVR_SBUS_FRAGMENTED = 00000100, // not implemented
 };
 
+// Tell the remote endpoint about how our telemetry is going.
 struct TelemetryPacket {
-  byte status;
+  byte status; // 4 flag
 };
 
 struct SBusMessage {

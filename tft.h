@@ -14,7 +14,7 @@ class TFT {
 public:
   void init() {
     tft.init();
-    tft.setRotation(2);
+    tft.setRotation(0);
     setFontSize(2);
     lastPktDraw = 0;
     background = TFT_BLACK;
@@ -67,7 +67,7 @@ public:
     // cheapen screen write timers by skipping a little execution
     if (lastPacketsPerSecond != myLastPacketsPerSecond) {
       zeroPrefix(pkt, lastPacketsPerSecond, 2);
-      setGoodColor(lastPacketsPerSecond, 334, 167);
+      setGoodColor(lastPacketsPerSecond, 250, 100);
       len += write(len, y, pkt);
       len += getCharSize();
       myLastPacketsPerSecond = lastPacketsPerSecond;

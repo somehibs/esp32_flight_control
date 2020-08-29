@@ -1,6 +1,6 @@
 // Here's where you configure everything 
 #define ESP32
-#define CONTROLLER // RECEIVER is implicit when CONTROLLER is undefined, i.e. the else in ifdef blocks
+//#define CONTROLLER // RECEIVER is implicit when CONTROLLER is undefined, i.e. the else in ifdef blocks
 #define TFT_ENABLE // Controller has a TFT module for displaying telemetry
 #define TELEMETRY_ENABLE // Telemetry is sent back over ESP NOW occasionally
 //#define TEST // TEST defines some functions that should only be called when testing this software

@@ -49,9 +49,19 @@ void refreshSbusMessage() {
   }
   for (int i = 0; i < MAX_DIGITAL_BYTES; ++i) {
     for (int j = 0; j < 4; ++j) {
+      if (i == MAX_DIGITAL_BYTES-1 && j >= 2) {
+        // last channel needs to break early
+        break;
+      }
       // If it's on, it's on. If it's off, it's off.
       chanIndex += 1;
     }
+  }
+  if (currentPacket.digitalChannels[MAX_DIGITAL_BYTES-1] << 3 & 0x1) {
+    currentMessage.postfix |= 1; // yay, hexadecimal 1
+  }
+  if (currentPacket.digitalChannels[MAX_DIGITAL_BYTES-1] << 4 & 0x1) {
+    currentMessage.postfix |= 1<<2;
   }
   if (dead > DEAD_PKT_THRESHOLD) {
     currentMessage.postfix |= 1<<4;
@@ -83,7 +93,7 @@ void emitTelemetry() {
 }
 
 bool connectSBus() {
-  Serial2.begin(100000, SERIAL_8E2, rxPin, txPin);
+  Serial2.begin(100000, SERIAL_8E2, 0, txPin);
   if (Serial2) {
     Serial.println("SBUS opened OK");
     return true;
@@ -92,6 +102,11 @@ bool connectSBus() {
     emitTelemetryStatus(RECVR_SBUS_NOT_READY);
     return false;
   }
+}
+
+bool connectSmartPort() {
+  short telemetryTxPin = 0;
+  Serial1.begin(57600, SERIAL_8E2, rxPin, telemetryTxPin);
 }
 
 void init_receiver(byte sbus_tx, byte sbus_rx) {
@@ -116,7 +131,7 @@ void maintain_telemetry() {
   }
 }
 
-short ok = 0;
+unsigned long ok = 0;
 void writeSBusMessage() {
     long written = Serial2.write((uint8_t*)&currentMessage, sizeof(SBusMessage));
     if (written == sizeof(SBusMessage)) {
@@ -124,6 +139,8 @@ void writeSBusMessage() {
       if (ok % 100 == 0) {
         Serial.print(ok, DEC);
         Serial.println(" messages written to SBus OK.");
+        Serial.print(currentMessage.postfix, HEX);
+        Serial.println(" postfix.");
       }
     } else {
       Serial.println(" bytes written to SBus does not match expected size!");

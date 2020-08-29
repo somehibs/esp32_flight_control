@@ -20,7 +20,6 @@ public:
   }
 
   byte getChannel(short chan) {
-    if (chan == 2) return 1 << chan;
     if (suppress) return false;
     byte newState = digitalRead(pin);
     if (newState != lastRead) {
@@ -115,20 +114,20 @@ public:
 
 FloatingAnalog leftAnalogH = FloatingAnalog(33);
 FloatingAnalog leftAnalogV = FloatingAnalog(32);
-FloatingAnalog rightAnalogH = FloatingAnalog(35);
-FloatingAnalog rightAnalogV = FloatingAnalog(34);
-FloatingAnalog throttlePot = FloatingAnalog(36);
-FloatingAnalog sensitivityPot = FloatingAnalog(-1);
+FloatingAnalog rightAnalogH = FloatingAnalog(36);
+FloatingAnalog rightAnalogV = FloatingAnalog(37);
+FloatingAnalog throttlePot = FloatingAnalog(38);
+FloatingAnalog sensitivityPot = FloatingAnalog(39);
 
-DigitalSwitch leftMost = DigitalSwitch(0);
-DigitalSwitch leftMid = DigitalSwitch(0);
+DigitalSwitch leftMost = DigitalSwitch(13);
+DigitalSwitch leftMid = DigitalSwitch(12);
 DigitalSwitch leftLeast = DigitalSwitch(0);
 DigitalSwitch rightMost = DigitalSwitch(0);
 DigitalSwitch rightMid = DigitalSwitch(0);
 DigitalSwitch rightLeast = DigitalSwitch(0);
 
-DigitalSwitch* digitalChannelOne[4] = {&leftMost, &leftMid, &leftLeast, &rightMost};
-DigitalSwitch* digitalChannelTwo[4] = {&rightMid, &rightLeast, 0, 0};
+DigitalSwitch* digitalChannelOne[4] = {0, 0, &leftLeast, &rightMost};
+DigitalSwitch* digitalChannelTwo[4] = {&rightMid, &rightLeast, &leftMid, &leftMost};
 
 #include "tft.h"
 #include "shared.h"
@@ -148,10 +147,10 @@ public:
   void calibrate() {
     // increase the sample count to improve reading accuracy
     // don't increase too much, or you'll end up sampling slightly low
-    analogSetCycles(18);
+    analogSetCycles(20);
     analogSetSamples(1);
     leftMost.state = true;
-    for (int i = 0; i < 5000; ++i) {
+    for (int i = 0; i < 256; ++i) {
       leftAnalogH.calibrate_step();
       leftAnalogV.calibrate_step();
       rightAnalogH.calibrate_step();
@@ -224,7 +223,7 @@ private:
 Controller ctl;
 
 void init_controller() {
-  ctl.init(false);
+  ctl.init(true);
 }
 
 void loop_controller() {
