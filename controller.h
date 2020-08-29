@@ -40,9 +40,21 @@ public:
   short pin;
 };
 
+short FloatingAnalogMaxOutput = 2000;
+short FloatingAnalogMinOutput = 1000;
+short FloatingAnalogMidOutput = 1500;
 class FloatingAnalog {
 public:
+  FloatingAnalog(short pin, const char* debugName) {
+    init(pin);
+    this->debugName = debugName;
+  }
   FloatingAnalog(short pin) {
+    init(pin);
+  }
+  
+  void init(short pin) {
+    this->debugName = 0;
     this->pin = pin;
     low = 999999;
     high = -999999;
@@ -58,7 +70,9 @@ public:
       high = r;
     }
     diff = (high-low)/2;
-    Serial.printf("Calibrate step: %d h:%d l:%d m:%d\n", r, high, low, getMid());
+    if (this->debugName != 0) {
+      Serial.printf("Calibrate %s: %d h:%d l:%d m:%d\n", this->debugName, r, high, low, getMid());
+    }
   }
 
   short getMid() {
@@ -82,15 +96,21 @@ public:
       return map(state, getMid(), ANALOG_MAX, 1500, 2000);
     } else {
       // state < mid
-      return map(state, 0, getMid(), 1000, 1500); 
+      return map(state, 0, getMid(), 1000, 1500);
     }
   }
+  
+  // measurements from multiple calibrate() calls
   short low;
   short high;
   short diff;
+
+  // hacked together control for inverting a variable resistor 
   bool invert;
-  
-  short pin;
+
+  // pin to use for analog reads
+  short pin; 
+  const char* debugName;
 };
 
 FloatingAnalog leftAnalogH = FloatingAnalog(33);
@@ -98,6 +118,7 @@ FloatingAnalog leftAnalogV = FloatingAnalog(32);
 FloatingAnalog rightAnalogH = FloatingAnalog(35);
 FloatingAnalog rightAnalogV = FloatingAnalog(34);
 FloatingAnalog throttlePot = FloatingAnalog(36);
+FloatingAnalog sensitivityPot = FloatingAnalog(-1);
 
 DigitalSwitch leftMost = DigitalSwitch(0);
 DigitalSwitch leftMid = DigitalSwitch(0);
@@ -114,16 +135,23 @@ DigitalSwitch* digitalChannelTwo[4] = {&rightMid, &rightLeast, 0, 0};
 
 class Controller {
 public:
-  void init() {
-    updateTft = true;
+  void init(bool enableTft) {
+    if (enableTft) {
+      updateTft = true;
+      tft.init();
+    }
+    // Packets are only sent once the last packet finishes sending (success or fail), so true for the first loop
     pktComplete = true;
-    tft.init();
     calibrate();
   }
 
   void calibrate() {
+    // increase the sample count to improve reading accuracy
+    // don't increase too much, or you'll end up sampling slightly low
+    analogSetCycles(18);
+    analogSetSamples(1);
     leftMost.state = true;
-    for (int i = 0; i < 200; ++i) {
+    for (int i = 0; i < 5000; ++i) {
       leftAnalogH.calibrate_step();
       leftAnalogV.calibrate_step();
       rightAnalogH.calibrate_step();
@@ -137,6 +165,9 @@ public:
   }
 
   void readPinsIntoPacket(ControlPacket* packet) {
+    short sensitivity = sensitivityPot.getChannel();
+    FloatingAnalogMaxOutput = map(sensitivity, 1000, 2000, 1750, 2000); // output strength mapped between 1750 and 2000
+    FloatingAnalogMinOutput = map(sensitivity, 1000, 2000, 1350, 1000); // yay inversion!
     packet->channels[0] = rightAnalogH.getChannel(); // roll
     packet->channels[1] = rightAnalogV.getChannel(); // pitch
     packet->channels[3] = leftAnalogH.getChannel(); // yaw
@@ -193,7 +224,7 @@ private:
 Controller ctl;
 
 void init_controller() {
-  ctl.init();
+  ctl.init(false);
 }
 
 void loop_controller() {

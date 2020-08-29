@@ -78,6 +78,7 @@ void emitTelemetryStatus(byte status) {
 }
 
 void emitTelemetry() {
+  
   emitTelemetryStatus(RECVR_OK);
 }
 
@@ -150,7 +151,7 @@ void maintain_sbus() {
     if (dead > LOST_PKT_THRESHOLD) {
       currentMessage.postfix |= 1<<3;
     }
-    //writeSBusMessage();
+    writeSBusMessage();
     //Serial.println("Missed a message");
   }
 }
@@ -158,7 +159,6 @@ void maintain_sbus() {
 void loop_receiver() {
   maintain_telemetry();
   maintain_sbus();
-  delay(2);
 }
 
 void send_callback(const uint8_t* peerMac, bool sent) {
