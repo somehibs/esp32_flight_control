@@ -113,9 +113,9 @@ public:
 rightAnalogV.getChannel(); // pitch
 leftAnalogH.getChannel(); // yaw
 throttlePot.getChannel(); // throttle*/
-FloatingAnalog leftAnalogH = FloatingAnalog(37);
+FloatingAnalog leftAnalogH = FloatingAnalog(33);
 FloatingAnalog leftAnalogV = FloatingAnalog(32);
-FloatingAnalog rightAnalogH = FloatingAnalog(33);
+FloatingAnalog rightAnalogH = FloatingAnalog(37);
 FloatingAnalog rightAnalogV = FloatingAnalog(36);
 FloatingAnalog throttlePot = FloatingAnalog(38);
 FloatingAnalog sensitivityPot = FloatingAnalog(39);
@@ -169,8 +169,8 @@ public:
 
   void readPinsIntoPacket(ControlPacket* packet) {
     short sensitivity = sensitivityPot.getChannel();
-    FloatingAnalogMaxOutput = map(sensitivity, 1000, 2000, 1750, 2000); // output strength mapped between 1750 and 2000
-    FloatingAnalogMinOutput = map(sensitivity, 1000, 2000, 1350, 1000); // yay inversion!
+    FloatingAnalogMaxOutput = map(sensitivity, 1000, 2000, 1625, 2000); // output strength mapped between 1750 and 2000
+    FloatingAnalogMinOutput = map(sensitivity, 1000, 2000, 1325, 1000); // yay inversion!
     //Serial.printf("Sensitivity: %d max %d min %d\n", sensitivity, FloatingAnalogMaxOutput, FloatingAnalogMinOutput);
     packet->channels[0] = rightAnalogH.getChannel(); // roll
     packet->channels[1] = rightAnalogV.getChannel(); // pitch
@@ -235,7 +235,7 @@ void init_controller() {
 
 void loop_controller() {
   ctl.loop();
-  delay(5);
+  delay(2);
 }
 
 void send_callback(const uint8_t* peerMac, bool sent) {

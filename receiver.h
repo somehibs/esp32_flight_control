@@ -14,8 +14,10 @@ bool mutatedCurrentPacket = false;
 SBusMessage currentMessage;
 bool outstandingPacket = false;
 
-#define DEAD_PKT_THRESHOLD 1000
-#define LOST_PKT_THRESHOLD 2
+#define FAILSAFE_THRESHOLD 250
+#define LOST_PKT_THRESHOLD 50
+#define SBUS_FAILSAFE_OFFSET 3
+#define SBUS_LOST_PKT_OFFSET 2
 short dead = 0;
 
 void reversi() {
@@ -27,7 +29,6 @@ void refreshSbusMessage() {
   memset(&currentMessage, 0, sizeof(SBusMessage));
   currentMessage.header = 0x0F;
   //currentPacket.channels[22]; // 16 11bit channels
-  short chanIndex = 0;
   if (!mutatedCurrentPacket) {
     for (int i = 0; i < MAX_ANALOG_CHANNELS; ++i) {
       currentPacket.channels[i] = map(currentPacket.channels[i], 1000, 2000, 173, 1811);//192, 1792);
@@ -37,6 +38,7 @@ void refreshSbusMessage() {
 
   short offset = 0;
   short byteindex = 1;
+  // Bind wire analog channels to SBus channels (currently RPTY to reduce packet size)
   for (unsigned i = 0; (i < MAX_ANALOG_CHANNELS) && (i < MAX_SBUS_CHANNELS); ++i) {
     /*protect from out of bounds values and limit to 11 bits*/
     if (currentPacket.channels[i] > 0x07ff) {
@@ -51,10 +53,13 @@ void refreshSbusMessage() {
     ((byte*)&currentMessage)[byteindex + 2] |= (currentPacket.channels[i] >> (16 - offset)) & 0xff;
     offset += 11;
   }
+
+  // Doesn't currently bind wire digital channels to SBus AUX channels
+  short chanIndex = 0;
   for (int i = 0; i < MAX_DIGITAL_BYTES; ++i) {
     for (int j = 0; j < 4; ++j) {
       if (i == MAX_DIGITAL_BYTES-1 && j >= 2) {
-        // last channel needs to break early
+        // protect last two channels from assignment, leaving them for postfix 17 and 18
         break;
       }
       // If it's on, it's on. If it's off, it's off.
@@ -68,65 +73,14 @@ void refreshSbusMessage() {
     currentMessage.postfix |= 1<<1;
   }
   if (dead > LOST_PKT_THRESHOLD) {
-    currentMessage.postfix |= 1<<2;
+    currentMessage.postfix |= 1<<SBUS_LOST_PKT_OFFSET;
   }
-  if (dead > DEAD_PKT_THRESHOLD) {
-    currentMessage.postfix |= 1<<3;
+  if (dead > FAILSAFE_THRESHOLD) {
+    currentMessage.postfix |= 1<<SBUS_FAILSAFE_OFFSET;
   }
   currentMessage.footer = 0x00;
   //reversi();
 }
-
-byte txPin, rxPin;
-
-void emitTelemetryStatus(byte status) {
-  Serial.print("Telemetry status send: ");
-  Serial.print(status, DEC);
-  Serial.println();
-  // check last emission time, don't say it more than every 100ms
-  if (lastPacketSent < millis()-1000) {
-    TelemetryPacket packet;
-    memset(&packet, 0, sizeof(TelemetryPacket));
-    packet.status = status;
-  }
-}
-
-void emitTelemetry() {
-  emitTelemetryStatus(RECVR_OK);
-}
-
-bool connectSBus() {
-  Serial2.begin(100000, SERIAL_8E2, 0, txPin);
-  if (Serial2) {
-    Serial.println("SBUS opened OK");
-    return true;
-  } else {
-    Serial.println("SBUS fail");
-    emitTelemetryStatus(RECVR_SBUS_NOT_READY);
-    return false;
-  }
-}
-
-bool connectSmartPort() {
-  short telemetryTxPin = 0;
-  Serial1.begin(57600, SERIAL_8E2, rxPin, telemetryTxPin);
-}
-
-// use another class with similar function names if you want to swap out telemetry. ensure everything is delegated to the telemetry class
-SmartPort telemetry;
-void init_receiver(byte sbus_rx, byte telemetry_rx, byte telemetry_tx) {
-  // clear packet
-  memset(&currentPacket, 0, sizeof(ControlPacket));
-  outstandingPacket = false;
-
-  // configure sbus
-  //txPin = sbus_tx;
-  rxPin = sbus_rx;
-  // start sbus
-  connectSBus();
-  telemetry.init(telemetry_rx, telemetry_tx);
-}
-
 unsigned long ok = 0;
 void writeSBusMessage() {
     long written = Serial2.write((uint8_t*)&currentMessage, sizeof(SBusMessage));
@@ -145,6 +99,60 @@ void writeSBusMessage() {
     }
 }
 
+
+byte txPin;
+
+void emitTelemetryStatus(byte status) {
+  Serial.print("Telemetry status send: ");
+  Serial.print(status, DEC);
+  Serial.println();
+  // check last emission time, don't say it more than every 100ms
+  if (lastPacketSent < millis()-1000) {
+    TelemetryPacket packet;
+    memset(&packet, 0, sizeof(TelemetryPacket));
+    packet.status = status;
+  }
+}
+
+void emitTelemetry() {
+  emitTelemetryStatus(RECVR_OK);
+}
+
+bool connectSBus() {
+  Serial2.begin(100000, SERIAL_8E2, 25, txPin);
+  if (Serial2) {
+    Serial.println("SBUS opened OK");
+    return true;
+  } else {
+    Serial.println("SBUS fail");
+    emitTelemetryStatus(RECVR_SBUS_NOT_READY);
+    return false;
+  }
+}
+
+// use another class with similar function names if you want to swap out telemetry. ensure everything is delegated to the telemetry class
+SmartPort telemetry;
+void init_receiver(byte sbus_tx, byte telemetry_rx, byte telemetry_tx) {
+  // clear packet
+  memset(&currentPacket, 0, sizeof(ControlPacket));
+  outstandingPacket = false;
+
+  // configure sbus
+  txPin = sbus_tx;
+  // start sbus
+  connectSBus();
+  //telemetry.init(telemetry_rx, telemetry_tx);
+}
+
+void maintain_sbus();
+void loop_receiver() {
+  maintain_sbus();
+  //telemetry.maintain();
+  if (dead > 0) {
+    delay(1); // be lenient, wait 2ms per dead increment
+  }
+}
+
 void maintain_sbus() {
   if (!Serial2) {
     connectSBus();
@@ -161,18 +169,13 @@ void maintain_sbus() {
   } else {
     dead += 1;
     if (dead > LOST_PKT_THRESHOLD) {
-      currentMessage.postfix |= 1<<2;
+      currentMessage.postfix |= 1<<SBUS_LOST_PKT_OFFSET;
     }
-    if (dead > DEAD_PKT_THRESHOLD) {
-      currentMessage.postfix |= 1<<3;
+    if (dead > FAILSAFE_THRESHOLD) {
+      currentMessage.postfix |= 1<<SBUS_FAILSAFE_OFFSET;
     }
     writeSBusMessage();
   }
-}
-
-void loop_receiver() {
-  maintain_sbus();
-  telemetry.maintain();
 }
 
 void send_callback(const uint8_t* peerMac, bool sent) {

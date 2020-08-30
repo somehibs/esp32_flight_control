@@ -1,6 +1,6 @@
 // Here's where you configure everything 
 #define ESP32
-//#define CONTROLLER // RECEIVER is implicit when CONTROLLER is undefined, i.e. the else in ifdef blocks
+#define CONTROLLER // RECEIVER is implicit when CONTROLLER is undefined, i.e. the else in ifdef blocks
 #define TFT_ENABLE // Controller has a TFT module for displaying telemetry
 #define TELEMETRY_ENABLE // Telemetry is sent back over ESP NOW occasionally
 //#define TEST // TEST defines some functions that should only be called when testing this software
@@ -29,9 +29,9 @@ bool controller = false;
 //uint8_t peerMacAddress[8] = {0x24,0x62,0xAB,0xF9,0x9D,0xA0}; // TFT MAC address
 uint8_t peerMacAddress[8] = {0x24,0x0A,0xC4,0x62,0x33,0x88}; // Controller MAC address
 // SBUS pins
-#define RX_PIN 27
-#define TELEMETRY_TX_PIN 26
-#define TELEMETRY_RX_PIN 25
+#define TX_PIN 26
+#define TELEMETRY_TX_PIN 27
+#define TELEMETRY_RX_PIN 24
 #endif // CONTROLLER
 
 
@@ -50,7 +50,7 @@ void setup() {
     init_controller();
 #else
     if(Serial)Serial.println("ROLE:RECEIVER");
-    init_receiver(RX_PIN, TELEMETRY_TX_PIN, TELEMETRY_RX_PIN);
+    init_receiver(TX_PIN, TELEMETRY_TX_PIN, TELEMETRY_RX_PIN);
 #endif //CONTROLLER
 }
 
