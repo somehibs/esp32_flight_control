@@ -14,7 +14,7 @@ bool mutatedCurrentPacket = false;
 SBusMessage currentMessage;
 bool outstandingPacket = false;
 
-#define DEAD_PKT_THRESHOLD 5
+#define DEAD_PKT_THRESHOLD 1000
 #define LOST_PKT_THRESHOLD 2
 short dead = 0;
 
@@ -61,16 +61,16 @@ void refreshSbusMessage() {
       chanIndex += 1;
     }
   }
-  if (currentPacket.digitalChannels[MAX_DIGITAL_BYTES-1] << 3 & 0x1) {
-    currentMessage.postfix |= 1; // yay, hexadecimal 1
+  if ( (currentPacket.digitalChannels[MAX_DIGITAL_BYTES-1]) & 0x1) {
+    currentMessage.postfix |= 1;
   }
-  if (currentPacket.digitalChannels[MAX_DIGITAL_BYTES-1] << 4 & 0x1) {
+  if ( (currentPacket.digitalChannels[MAX_DIGITAL_BYTES-1] >> 1) & 0x1) {
+    currentMessage.postfix |= 1<<1;
+  }
+  if (dead > LOST_PKT_THRESHOLD) {
     currentMessage.postfix |= 1<<2;
   }
   if (dead > DEAD_PKT_THRESHOLD) {
-    currentMessage.postfix |= 1<<4;
-  }
-  if (dead > LOST_PKT_THRESHOLD) {
     currentMessage.postfix |= 1<<3;
   }
   currentMessage.footer = 0x00;
@@ -127,9 +127,6 @@ void init_receiver(byte sbus_rx, byte telemetry_rx, byte telemetry_tx) {
   telemetry.init(telemetry_rx, telemetry_tx);
 }
 
-void maintain_telemetry() {
-}
-
 unsigned long ok = 0;
 void writeSBusMessage() {
     long written = Serial2.write((uint8_t*)&currentMessage, sizeof(SBusMessage));
@@ -138,7 +135,9 @@ void writeSBusMessage() {
       if (ok % 100 == 0) {
         Serial.print(ok, DEC);
         Serial.println(" messages written to SBus OK.");
-        Serial.print(currentMessage.postfix, HEX);
+        Serial.print(currentPacket.digitalChannels[MAX_DIGITAL_BYTES-1], BIN);
+        Serial.print(" digi, ");
+        Serial.print(currentMessage.postfix, BIN);
         Serial.println(" postfix.");
       }
     } else {
@@ -161,20 +160,19 @@ void maintain_sbus() {
     writeSBusMessage();
   } else {
     dead += 1;
-    if (dead > DEAD_PKT_THRESHOLD) {
-      currentMessage.postfix |= 1<<4;
-    }
     if (dead > LOST_PKT_THRESHOLD) {
+      currentMessage.postfix |= 1<<2;
+    }
+    if (dead > DEAD_PKT_THRESHOLD) {
       currentMessage.postfix |= 1<<3;
     }
     writeSBusMessage();
-    //Serial.println("Missed a message");
   }
 }
 
 void loop_receiver() {
-  telemetry.maintain();
   maintain_sbus();
+  telemetry.maintain();
 }
 
 void send_callback(const uint8_t* peerMac, bool sent) {
