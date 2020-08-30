@@ -5,6 +5,8 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 
+#include "shared.h"
+
 #define LINE_HEIGHT 20
 #define LINE_WIDTH TFT_WIDTH
 #define MAX_LINES 10
@@ -50,14 +52,65 @@ public:
     }
     sprintf(buf+offset, "%d", input);
   }
-  
+
+  short getLineIndex(short line) {
+    return line*LINE_HEIGHT+10;
+  }
+
+  void renderControlState(ControlPacket& packet) {
+    if (tooFast(&lastCtlDraw)) {
+      return;
+    }
+    char pkt[64];
+    short y = this->getLineIndex(9);
+    short len = 0;
+    sprintf(pkt, "R%d", map(packet.channels[0],1000,2000,0,9));
+    setGoodColor(packet.channels[0], 1550, 1450);
+    len += write(len, y, pkt);
+    len += getCharSize();
+    sprintf(pkt, "P%d", map(packet.channels[1],1000,2000,0,9));
+    setGoodColor(packet.channels[1], 1550, 1450);
+    len += write(len, y, pkt);
+    len += getCharSize();
+    sprintf(pkt, "Y%d", map(packet.channels[3],1000,2000,0,9));
+    setGoodColor(packet.channels[3], 1550, 1450);
+    len += write(len, y, pkt);
+    len += getCharSize();
+    sprintf(pkt, "T%d", map(packet.channels[2],1000,2000,0,9));
+    setGoodColor(packet.channels[2], 1750, 1250);
+    len += write(len, y, pkt);
+    len += getCharSize();
+
+    len = 0;
+    y = this->getLineIndex(8);
+    if (packet.digitalChannels[MAX_DIGITAL_BYTES-1] & 0x1) {
+      sprintf(pkt, "PRE.");
+      tft.setTextColor(TFT_GREEN, background);
+      len += write(len, y, pkt);
+      len += getCharSize();
+    } else {
+      sprintf(pkt, "    ");
+      len += write(len, y, pkt);
+      len += getCharSize();
+    }
+    if (packet.digitalChannels[MAX_DIGITAL_BYTES-1] & 0x2) {
+      sprintf(pkt, " ARMED");
+      tft.setTextColor(TFT_GREEN, background);
+      len += write(len-1, y, pkt);
+      len += getCharSize();
+    } else {
+      sprintf(pkt, "      ");
+      len += write(len, y, pkt);
+    }
+  }
+
   void updatePackets() {
     if (tooFast(&lastPktDraw)) {
       return;
     }
     char pkt[64];
     short len = 0;
-    short y = MAX_LINES*LINE_HEIGHT+10;
+    short y = this->getLineIndex(MAX_LINES);
     // pretty much always needs another render
     zeroPrefix(pkt, packetsPerSecond, 2);
     tft.setTextColor(TFT_SILVER, background);
@@ -149,6 +202,7 @@ private:
   short myLastPacketsPerSecond;
   short myLastFailedPerSecond;
   unsigned long lastPktDraw;
+  unsigned long lastCtlDraw;
 };
 
 

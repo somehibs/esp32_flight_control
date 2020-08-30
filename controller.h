@@ -20,7 +20,7 @@ public:
   }
 
   byte getChannel(short chan) {
-    if (suppress) return false;
+    if (suppress) return 0x0000;
     byte newState = digitalRead(pin);
     if (newState != lastRead) {
       if (newState) {
@@ -89,13 +89,11 @@ public:
     // 0 - mid is 1500-2000
     // mid should be 2000 perfectly
     // mid - high is 2000-2500
-    short offset = 1500;
     if (state >= diff) {
-      offset += 500;
-      return map(state, getMid(), ANALOG_MAX, 1500, 2000);
+      return map(state, getMid(), ANALOG_MAX, FloatingAnalogMidOutput, FloatingAnalogMaxOutput);
     } else {
       // state < mid
-      return map(state, 0, getMid(), 1000, 1500);
+      return map(state, 0, getMid(), FloatingAnalogMinOutput, FloatingAnalogMidOutput);
     }
   }
   
@@ -111,11 +109,14 @@ public:
   short pin; 
   const char* debugName;
 };
-
-FloatingAnalog leftAnalogH = FloatingAnalog(33);
+/*rightAnalogH.getChannel(); // roll
+rightAnalogV.getChannel(); // pitch
+leftAnalogH.getChannel(); // yaw
+throttlePot.getChannel(); // throttle*/
+FloatingAnalog leftAnalogH = FloatingAnalog(37);
 FloatingAnalog leftAnalogV = FloatingAnalog(32);
-FloatingAnalog rightAnalogH = FloatingAnalog(36);
-FloatingAnalog rightAnalogV = FloatingAnalog(37);
+FloatingAnalog rightAnalogH = FloatingAnalog(33);
+FloatingAnalog rightAnalogV = FloatingAnalog(36);
 FloatingAnalog throttlePot = FloatingAnalog(38);
 FloatingAnalog sensitivityPot = FloatingAnalog(39);
 
@@ -149,7 +150,6 @@ public:
     // don't increase too much, or you'll end up sampling slightly low
     analogSetCycles(20);
     analogSetSamples(1);
-    leftMost.state = true;
     for (int i = 0; i < 256; ++i) {
       leftAnalogH.calibrate_step();
       leftAnalogV.calibrate_step();
@@ -161,19 +161,25 @@ public:
     throttlePot.diff = 0;
     throttlePot.high = ANALOG_MAX;
     throttlePot.invert = true;
+    sensitivityPot.low = 0;
+    sensitivityPot.diff = 0;
+    sensitivityPot.high = ANALOG_MAX;
+    //sensitivityPot.invert = true;
   }
 
   void readPinsIntoPacket(ControlPacket* packet) {
     short sensitivity = sensitivityPot.getChannel();
     FloatingAnalogMaxOutput = map(sensitivity, 1000, 2000, 1750, 2000); // output strength mapped between 1750 and 2000
     FloatingAnalogMinOutput = map(sensitivity, 1000, 2000, 1350, 1000); // yay inversion!
+    //Serial.printf("Sensitivity: %d max %d min %d\n", sensitivity, FloatingAnalogMaxOutput, FloatingAnalogMinOutput);
     packet->channels[0] = rightAnalogH.getChannel(); // roll
     packet->channels[1] = rightAnalogV.getChannel(); // pitch
     packet->channels[3] = leftAnalogH.getChannel(); // yaw
     packet->channels[2] = throttlePot.getChannel(); // throttle
     packet->digitalChannels[0] = getDigitalChannel(0);
     packet->digitalChannels[1] = getDigitalChannel(1);
-    //Serial.printf("R: %d P: %d Y: %d T: %d digi: %d dig2: %d\n", packet->channels[0], packet->channels[1], packet->channels[2], packet->channels[3], packet->digitalChannels[0], packet->digitalChannels[1]);
+    //Serial.print(packet->digitalChannels[1], BIN);
+    //Serial.printf(" R: %d P: %d Y: %d T: %d digi: %d dig2: %d\n", packet->channels[0], packet->channels[1], packet->channels[3], packet->channels[2], packet->digitalChannels[0], packet->digitalChannels[1]);
   }
 
   byte getDigitalChannel(short channel) {
@@ -183,9 +189,9 @@ public:
       switches = digitalChannelTwo;
     }
     
-    for (int i = 1; i < 5; ++i) {
-      if (switches[i-1] != 0) {
-        ret |= switches[i-1]->getChannel(i);
+    for (int i = 0; i < 4; ++i) {
+      if (switches[i] != 0) {
+        ret |= switches[i]->getChannel(3-i);
       }
     }
     return ret;
@@ -200,6 +206,7 @@ public:
       readPinsIntoPacket(&packet);
       send_radio((const uint8_t*)&packet, sizeof(ControlPacket));
       tft.updatePackets();
+      tft.renderControlState(packet);
     }
     if (updateTft) {
       tft.updatePackets();
@@ -228,7 +235,7 @@ void init_controller() {
 
 void loop_controller() {
   ctl.loop();
-  delay(3);
+  delay(5);
 }
 
 void send_callback(const uint8_t* peerMac, bool sent) {

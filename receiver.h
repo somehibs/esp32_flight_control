@@ -1,9 +1,13 @@
 #ifndef RECEIVER_H
 #define RECEIVER_H
 
-// this is an sbus implementation
-
+// this is an sbus receiver implementation
 #include "shared.h"
+
+// this is sport, but you could comment it out and implement another telemetry mechanism. this seems fairly flexible, so it's probably your first preference.
+// you can add on to the smartport system with your own vendor specific codes - we don't have to be compatible with frsky nor do our own checksumming thanks to protocol layer checksums and retransmission (chinese espnow radio stack)
+// note the custom behaviour in the telemetry system to handle dead packets and transmit time bound historical averages to the controller
+#include "telemetry.h"
 
 ControlPacket currentPacket;
 bool mutatedCurrentPacket = false;
@@ -88,7 +92,6 @@ void emitTelemetryStatus(byte status) {
 }
 
 void emitTelemetry() {
-  
   emitTelemetryStatus(RECVR_OK);
 }
 
@@ -109,26 +112,22 @@ bool connectSmartPort() {
   Serial1.begin(57600, SERIAL_8E2, rxPin, telemetryTxPin);
 }
 
-void init_receiver(byte sbus_tx, byte sbus_rx) {
+// use another class with similar function names if you want to swap out telemetry. ensure everything is delegated to the telemetry class
+SmartPort telemetry;
+void init_receiver(byte sbus_rx, byte telemetry_rx, byte telemetry_tx) {
   // clear packet
   memset(&currentPacket, 0, sizeof(ControlPacket));
   outstandingPacket = false;
 
   // configure sbus
-  txPin = sbus_tx;
+  //txPin = sbus_tx;
   rxPin = sbus_rx;
   // start sbus
   connectSBus();
+  telemetry.init(telemetry_rx, telemetry_tx);
 }
 
 void maintain_telemetry() {
-  // Make sure the RX bus is serviced
-  if (Serial2) {
-    while (Serial2.available()) {
-      // Figure out how to consume telemetry data. For now, suck it up to make sure no one gets full buffers.
-      Serial2.read();
-    }
-  }
 }
 
 unsigned long ok = 0;
@@ -174,7 +173,7 @@ void maintain_sbus() {
 }
 
 void loop_receiver() {
-  maintain_telemetry();
+  telemetry.maintain();
   maintain_sbus();
 }
 
